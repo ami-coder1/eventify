@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Eventify Dashboard</title>
+    <link rel="shortcut icon" href="/img/logo-64x64.png">
+    <link rel="apple-touch-icon" sizes="64x64" href="/img/logo-64x64.png">
+    <link rel="manifest" href="/manifest.json">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600,700" rel="stylesheet" />
+    <link href="/css/main.css" rel="stylesheet" />
+    <style>
+
+    .list-group li{background-color:initial!important;padding:.75rem 0}
+    textarea{max-height:300px}
+    .export textarea{background-color:#f9f9f9!important}
+    .export h6, .import h6{font-weight: 600;font-size:1.1rem;margin-bottom:1.2rem;}
+    .user-photo{width:80px}
+    .user-name{font-weight:600}
+
+    @media (min-width:768px) {
+        .input-responsive{width:50%}
+    }
+
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-vertical fixed-left navbar-expand-md navbar-light" id="sidenav-main">
+        <div class="container-fluid">
+            <button class="navbar-toggler" type="button" name="navbarFadeIn">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand pr-3" href="/" title="Eventify Logo">Eventify</a>
+            <div class="navbar-collapse" id="navcol">
+                <div class="navbar-collapse-header d-md-none">
+                    <div class="row">
+                        <div class="col-6 collapse-brand">
+                            <a href="/" title="Eventify Logo">Eventify</a>
+                        </div>
+                        <div class="col-6 collapse-close align-self-center">
+                            <button class="navbar-toggler" type="button" name="navbarFadeOut"></button>
+                        </div>
+                    </div>
+                </div>
+                <ul class="navbar-nav">
+                    <li class="nav-item"><a class="nav-link active" href="/">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/events">Events</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/goals">Goals</a></li>
+                </ul>
+                <hr class="my-3">
+                <ul class="navbar-nav mb-md-3">
+                    <li class="nav-item"><a id="logout" class="nav-link" href="javascript:void(0)">Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="main-content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col">
+                    <h3 class="page-nav">Dashboard</h3>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <div class="card rounded-0 mt-4 bg-white p-4 text-muted">
+                        <div class="card-header bg-white border-0 p-0 mb-3">
+                            <h3>How's it going ?</h3>
+                        </div>
+                        <div id="user" class="card-body p-0">
+                            <h6>Loading user profile ...</h6>
+                        </div>
+                    </div>
+                    <div class="card rounded-0 mt-4 bg-white p-4">
+                        <div class="export mt-1 mb-4">
+                            <h6>Export data</h6>
+                            <textarea id="exportTextarea" class='form-control mt-3 rounded-0' readonly>Loading ...</textarea>
+                        </div>
+                        <div class="import my-1">
+                            <h6>Import data</h6>
+                            <textarea id="importTextarea" class="form-control mb-3 rounded-0" placeholder="Paste here ..." rows="4"></textarea>
+                            <button id="importSubmit" class="btn btn-primary px-3 rounded-0" disabled>Submit</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://www.gstatic.com/firebasejs/7.4.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.4.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.4.0/firebase-firestore.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/autosize.js/4.0.2/autosize.min.js"></script>
+    <script src="/js/main.js"></script>
+    <script>
+
+    firebase.auth().onAuthStateChanged((user) => {
+        if (!user) {
+            return location.href = "/login";
+        }
+
+        let userRef = fs.collection("users").doc(user.uid);
+        
+        document.getElementById("user").outerHTML = `
+            <div id="user" class="card-body row p-0">
+                <div class="col-sm-auto px-3 mb-3 mb-sm-0">
+                    <img class="user-photo rounded-circle border" src="${user.photoURL}">
+                </div>
+                <div class="col px-sm-0 px-3 align-self-center">
+                    <h5 class="user-name">${user.displayName}</h5>
+                    <h6 class="user-email">${user.email}</h6>
+                </div>
+            </div>
+        `;
+
+        let result = {};
+        let exportTextarea = document.getElementById("exportTextarea");
+
+        autosize(exportTextarea);
+        exportTextarea.addEventListener('focus', function() {
+            this.select();
+        });
+        
+        userRef.collection("events").get().then((data) => {
+            if (!data.empty) {
+                let events = {};
+                for(let rawDoc of data.docs) {
+                    let doc = rawDoc.data();
+                    if (doc.hasOwnProperty("date")) {
+                        doc.date = doc.date.toMillis();
+                    }
+                    events[rawDoc.id] = doc;
+                }
+                result.events = events;
+            }
+            
+            return userRef.collection("goals").get();
+
+        }).then((data) => {
+            if (!data.empty) {
+                let goals = {};
+                for(let rawDoc of data.docs) {
+                    goals[rawDoc.id] = rawDoc.data();
+                }
+                result.goals = goals;
+            }
+
+            exportTextarea.value = JSON.stringify(result);
+            autosize.update(exportTextarea);
+
+        });
+
+        let importTextarea = document.getElementById("importTextarea");
+        let importSubmit = document.getElementById("importSubmit");
+
+        autosize(importTextarea);
+
+        importTextarea.addEventListener("input", function() {
+            this.style.borderColor = null;
+            importSubmit.disabled = this.value === "" ? true : false;
+        });
+
+        importSubmit.addEventListener("click", () => {
+            try {
+                let data = JSON.parse(importTextarea.value);
+                if (!Object.keys(data).every((elem) => ["events", "goals"].indexOf(elem) !== -1)) throw new Error();
+
+                for (let [colName, colData] of Object.entries(data)) {
+                    if (!colData || typeof colData != "object" || Object.keys(colData).length === 0) throw new Error();
+                    
+                    for (let [docID, docData] of Object.entries(colData)) {
+                        if (docData.hasOwnProperty("date")) {
+                            docData.date = firebase.firestore.Timestamp.fromMillis(docData.date);
+                        }
+                        userRef.collection(colName).doc(docID).set(docData, { merge:true });
+                    }
+                }
+
+                notif("Data successfully imported!", { type: "info" });
+
+            } catch(err) {
+                importTextarea.style.borderColor = "#fd8f9a";
+            }
+        });
+    });
+
+    </script>
+</body>
+
+</html>

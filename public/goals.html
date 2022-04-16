@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Goals – Eventify</title>
+    <link rel="shortcut icon" href="/img/logo-64x64.png">
+    <link rel="apple-touch-icon" sizes="64x64" href="/img/logo-64x64.png">
+    <link rel="manifest" href="/manifest.json">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600,700" rel="stylesheet" />
+    <link href="/css/main.css" rel="stylesheet" />
+    <style>
+    
+    ol.list-group{list-style:none;counter-reset:item}
+    ol.list-group > li{counter-increment:item;cursor:grab}
+    ol.list-group > li:before{margin-right:1rem;content:counter(item);font-size:1rem;text-align:center;font-weight:600;display:inline-block}
+    ol.list-group > li:nth-child(1):before{font-size:1.225rem}
+    ol.list-group > li:nth-child(2):before{font-size:1.15rem}
+    ol.list-group > li:nth-child(3):before{font-size:1.075rem}
+
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-vertical fixed-left navbar-expand-md navbar-light" id="sidenav-main">
+        <div class="container-fluid">
+            <button class="navbar-toggler" type="button" name="navbarFadeIn">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand pr-3" href="/" title="Eventify Logo">Eventify</a>
+            <div class="navbar-collapse" id="navcol">
+                <div class="navbar-collapse-header d-md-none">
+                    <div class="row">
+                        <div class="col-6 collapse-brand">
+                            <a href="/" title="Eventify Logo">Eventify</a>
+                        </div>
+                        <div class="col-6 collapse-close align-self-center">
+                            <button class="navbar-toggler" type="button" name="navbarFadeOut"></button>
+                        </div>
+                    </div>
+                </div>
+                <ul class="navbar-nav">
+                    <li class="nav-item"><a class="nav-link" href="/">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/events">Events</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/goals">Goals</a></li>
+                </ul>
+                <hr class="my-3">
+                <ul class="navbar-nav mb-md-3">
+                    <li class="nav-item"><a id="logout" class="nav-link" href="javascript:void(0)">Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="main-content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col d-flex align-items-center justify-content-between justify-content-md-start">
+                    <h3 class="page-nav d-inline-block">Goals</h3>
+                    <span id="add" class="ml-4 px-3 py-1 bg-white float-right float-md-none rounded-pill pointer">
+                        <i title="Add goal" class="add-button"></i>
+                    </span>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <div id="goals-wrapper" class="card rounded-0 mt-4">
+                        <div id="goals" class='small my-3 mx-4 text-center'>Loading data ...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://www.gstatic.com/firebasejs/7.4.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.4.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.4.0/firebase-firestore.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dragula/3.7.2/dragula.min.js"></script>
+    <script src="/js/main.js"></script>
+    <script>
+        
+    firebase.auth().onAuthStateChanged((user) => {
+        if (!user) {
+            return location.href = "/login?ref=goals";
+        }
+
+        let goalsRef = fs.collection("users").doc(user.uid).collection('goals');
+
+        goalsRef.orderBy('sort').onSnapshot((data) => {
+            let elem = '';
+            let cachingData = {};
+            
+            if (!data.empty) {
+                elem += `<ol id='goals' class='list-group list-group-flush'>`;
+                data.forEach((v) => {
+                    let d = v.data();
+                    elem += `
+                        <li class='list-group-item d-flex' data-id='${v.id}'>
+                            <span class='align-self-center'>
+                                ${d.link !== "" ? `<a href='${d.link.toUrl()}' target='_blank'>${d.name}</a>` : d.name}
+                            </span>
+                            <span class='action float-right align-self-center ml-auto col-auto pr-0 pl-2'>
+                                <i title='Edit' class='icon edit mr-2'></i>
+                                <i title='Delete' class='icon delete'></i>
+                            </span>
+                        </li>
+                    `;
+                    cachingData[v.id] = d;
+                });
+                elem += `</ol>`;
+            } else {
+                elem += `<div id='goals' class='small my-3 mx-4 text-center'>No goal has been added yet</div>`;
+            }
+            
+            document.getElementById("goals").outerHTML = elem;
+
+            sessionStorage.goalsData = JSON.stringify(cachingData);
+
+            let scrollable = true;
+            let listener = (evt) => {
+                if (!scrollable) evt.preventDefault();
+            };
+
+            document.addEventListener('touchmove', listener, { passive:false });
+
+            dragula([document.getElementById("goals")]).on("drag", () => { 
+                scrollable = false;
+            }).on("dragend", () => {
+                scrollable = true;
+            }).on("drop", (el) => {
+                let data = cachingData;
+                let prev = el.previousElementSibling;
+                let next = el.nextElementSibling;
+                prev = prev !== null ? data[prev.dataset.id].sort : data[next.dataset.id].sort - 100000;
+                next = next !== null ? data[next.dataset.id].sort : prev + 100000;
+                goalsRef.doc(el.dataset.id).update({ sort: (prev + next) / 2 });
+            });
+        });
+
+        document.getElementById("add").addEventListener("click", () => {
+            modal("Add new goal", ["title", "link"], {
+                titlePlac: "Goal Name",
+                linkPlac: "Redirect Link (Optional)"
+            }, ({ title: name, link }) => {
+                goalsRef.add({
+                    name: name,
+                    link: link,
+                    sort: +(+_d() + "" + Math.floor(1000 + Math.random() * 9000))
+                });
+            });
+        });
+
+        document.addEventListener("click", (evt) => {
+            let id, event;
+            let goalsDt = JSON.parse(sessionStorage.goalsData);
+            let t = evt.target;
+
+            if (t.parentNode.parentNode != null && t.parentNode.parentNode.hasAttribute("data-id")) {
+                id = t.parentNode.parentNode.dataset.id;
+                goal = goalsDt[id];
+            }
+
+            if (t && t.classList.contains("edit")) {
+                modal("Edit goal", ["title", "link"], {
+                    titlePlac: "Goal Name",
+                    titleVal: goal.name,
+                    linkPlac: "Redirect Link (Optional)",
+                    linkVal: goal.link
+                }, ({ title: name, link }) => goalsRef.doc(id).update({
+                    name: name,
+                    link: link
+                }));
+
+            } else if (t && t.classList.contains("delete")) {
+                goalsRef.doc(id).delete().then(() => {
+                    notif("Goal successfully deleted!", { type: "info", whenUndo: () => {
+                        goalsRef.doc(id).set(goal);
+                    }});
+                });
+                
+            }
+        });
+    });
+
+    </script>
+</body>
+
+</html>

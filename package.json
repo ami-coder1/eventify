@@ -1,0 +1,16 @@
+{
+  "name": "skeduler",
+  "version": "1.0.0",
+  "description": "Easy to use event scheduler build with Firebase",
+  "keywords": [
+    "firebase",
+    "bootstrap",
+    "scheduler",
+    "schedule-manager"
+  ],
+  "author": "Dafiul Haq",
+  "license": "MIT",
+  "dependencies": {
+    "firebase": "^9.6.10"
+  }
+}
